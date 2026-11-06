@@ -35,7 +35,7 @@ Dev gotchas:
 - Open the app at `localhost:5173`, not `127.0.0.1`. Non-GET requests must send an `Origin` that exactly matches `APP_ORIGIN`.
 - Sign-in emails go to Mailpit: UI at http://localhost:8025, JSON API at `/api/v1/...` (the e2e tests read codes from it).
 - `api` loads `.env` from the current directory, so run it from `backend/`. `backend/.env` is gitignored; `.env.example` is the template and documents every variable.
-- Playwright's `webServer` starts the API and web servers if they aren't already running. Don't start them concurrently with a test run, or the second API fails to bind 8787.
+- Playwright's `webServer` starts the API and the **production build** (`vite preview`, also on 5173) if they aren't already running; a running `make web` dev server is reused. Don't start servers concurrently with a test run, or the second one fails to bind its port.
 - Local `AUTH_RATE_LIMIT_PER_MINUTE=300` (production default 20) so parallel e2e runs don't trip the per-IP limit.
 
 ## Architecture

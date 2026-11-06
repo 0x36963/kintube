@@ -28,7 +28,9 @@ export default defineConfig({
       timeout: 300_000,
     },
     {
-      command: "pnpm run dev",
+      // The production build, as deployed. Vite's dev server compiles modules on first request,
+      // which made the first test on a cold CI runner flaky. Locally, a running `make web` is reused.
+      command: "pnpm run build && pnpm exec vite preview --port 5173 --strictPort",
       url: "http://localhost:5173",
       reuseExistingServer: !process.env.CI,
     },
