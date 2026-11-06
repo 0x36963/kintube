@@ -1,0 +1,33 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+app-core = { version = "0.1.0", path = "../app-core" }
+axum = { version = "0.8.9", features = ["macros"] }
+axum-extra = { version = "0.12.6", features = ["cookie"] }
+chrono = "0.4.45"
+dotenvy = "0.15.7"
+governor = "0.10.4"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "macros"] }
+time = "0.3.55"
+tokio = { version = "1.54.1", features = ["full"] }
+tower = "0.5.3"
+tower-http = { version = "0.7.1", features = ["trace", "request-id", "util"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+utoipa = { version = "6.0.0", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-axum = "0.3.0"
+uuid = "1.29.0"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tower = { version = "0.5.3", features = ["util"] }

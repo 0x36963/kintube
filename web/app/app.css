@@ -1,0 +1,71 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter"; /* self-hosted: no third-party font requests */
+
+/*
+ * Design tokens. Components only use the semantic names (bg-surface, text-fg-muted…),
+ * so a light theme later is just another set of values for these variables.
+ */
+:root {
+  --bg: #0e0e10;
+  --surface: #17171a;
+  --surface-2: #202024;
+  --surface-3: #2a2a2f;
+  --line: #2c2c31;
+  --fg: #f3f3f4;
+  --fg-muted: #a6a6ad;
+  --fg-subtle: #6f6f78;
+  /* Placeholder brand colour (warm "ember"), to be replaced with the real brand. */
+  --accent: #ff8a3d;
+  --accent-hover: #ff9d5c;
+  --accent-fg: #1c0c02;
+  --danger: #f87171;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+}
+
+html,
+body {
+  @apply bg-bg text-fg antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-accent;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
