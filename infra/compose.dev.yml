@@ -30,5 +30,20 @@ services:
       MP_SMTP_AUTH_ACCEPT_ANY: "1"
       MP_SMTP_AUTH_ALLOW_INSECURE: "1"
 
+  # S3-compatible object storage (stands in for Cloudflare R2). MinIO's community images were
+  # discontinued in 2025; RustFS is Apache-2.0 and MinIO-compatible. Console: http://localhost:9001
+  s3:
+    image: rustfs/rustfs:1.0.4
+    environment:
+      RUSTFS_ACCESS_KEY: kintube
+      RUSTFS_SECRET_KEY: kintube-dev-secret
+      RUSTFS_CONSOLE_ENABLE: "true"
+    ports:
+      - "127.0.0.1:9000:9000" # S3 API
+      - "127.0.0.1:9001:9001" # Console
+    volumes:
+      - s3data:/data
+
 volumes:
   pgdata:
+  s3data:

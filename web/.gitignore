@@ -9,3 +9,6 @@
 # Playwright
 /test-results/
 /playwright-report/
+
+# Generated e2e fixtures
+/e2e/.fixtures/

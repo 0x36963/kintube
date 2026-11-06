@@ -72,6 +72,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Event stream (`text/event-stream`). Events: `media` (a [`MediaStatusEvent`]) and
+         *     `resync` (updates were missed; refetch).
+         */
+        get: operations["events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -105,10 +125,188 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The library, newest first. Includes items still processing or that failed. */
+        get: operations["list_media"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/media/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One item, with playback URLs once it's ready. */
+        get: operations["get_media"];
+        put?: never;
+        post?: never;
+        /** Move to the trash. Restorable for 30 days, then deleted for good. */
+        delete: operations["trash_media"];
+        options?: never;
+        head?: never;
+        patch: operations["update_media"];
+        trace?: never;
+    };
+    "/api/media/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["restore_media"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_trash"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trash/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a trashed item for good, freeing its storage. */
+        delete: operations["purge_media"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start an upload. Fails with `storage_quota_exceeded` if the file doesn't fit. */
+        post: operations["create_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which parts are already stored. Use it to resume after a refresh or network loss. */
+        get: operations["upload_status"];
+        put?: never;
+        post?: never;
+        /** Cancel an upload and release its reserved storage. */
+        delete: operations["abort_upload"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/{id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish the upload and queue processing. Idempotent. */
+        post: operations["complete_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/{id}/parts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["presign_parts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CreateUpload: {
+            filename: string;
+            /** @description The browser's `File.type`; may be empty. */
+            mime_type?: string;
+            /**
+             * Format: int64
+             * @description Bytes.
+             */
+            size: number;
+        };
         /** @description Every error response has this shape: `{"error": {"code": "...", "message": "..."}}`. */
         ErrorBody: {
             error: components["schemas"]["ErrorDetail"];
@@ -133,6 +331,102 @@ export interface components {
             /** @description `user` or `admin`. */
             role: string;
         };
+        MediaDetail: {
+            media: components["schemas"]["MediaItem"];
+            playback?: components["schemas"]["Playback"] | null;
+        };
+        /** @description A video (photos arrive in M3) as shown in grids and lists. */
+        MediaItem: {
+            /** Format: int64 */
+            bytes: number;
+            /** Format: date-time */
+            created_at: string;
+            description: string;
+            /** Format: int64 */
+            duration_ms?: number | null;
+            hdr?: boolean | null;
+            /** Format: int32 */
+            height?: number | null;
+            /** Format: uuid */
+            id: string;
+            /** @description `video` or `photo`. */
+            kind: string;
+            original_filename: string;
+            /** @description Poster images, smallest first, as signed URLs. Empty until processed. */
+            posters: components["schemas"]["Poster"][];
+            /** @description Why processing failed, for the owner. */
+            processing_error?: string | null;
+            /**
+             * Format: float
+             * @description 0–1 while processing.
+             */
+            processing_progress: number;
+            /** @description `uploading`, `processing`, `ready` or `failed`. */
+            status: string;
+            /**
+             * Format: date-time
+             * @description When it was recorded, if the file says.
+             */
+            taken_at?: string | null;
+            title: string;
+            /** Format: date-time */
+            trashed_at?: string | null;
+            /**
+             * Format: int32
+             * @description Display size, after rotation. Known once processed.
+             */
+            width?: number | null;
+        };
+        MediaPage: {
+            items: components["schemas"]["MediaItem"][];
+            /** @description Pass as `cursor` to get the next page; absent on the last page. */
+            next_cursor?: string | null;
+        };
+        /** @description Payload of a `media` event. */
+        MediaStatusEvent: {
+            error?: string | null;
+            /** Format: uuid */
+            media_id: string;
+            /** Format: float */
+            progress: number;
+            /** @description `processing`, `ready`, `failed`, or `deleted`. */
+            status: string;
+        };
+        Playback: {
+            /** @description HLS master playlist (signed URL; segments inherit the token). */
+            hls_url: string;
+            renditions: components["schemas"]["RenditionInfo"][];
+            /** @description WebVTT track of scrub-preview thumbnails. */
+            thumbnails_url?: string | null;
+        };
+        Poster: {
+            /** Format: int32 */
+            height: number;
+            url: string;
+            /** Format: int32 */
+            width: number;
+        };
+        PresignParts: {
+            /** @description Up to 100 part numbers. */
+            part_numbers: number[];
+        };
+        PresignedPart: {
+            /** Format: int32 */
+            part_number: number;
+            /** @description `PUT` the part's bytes here. Valid for an hour. */
+            url: string;
+        };
+        PresignedParts: {
+            parts: components["schemas"]["PresignedPart"][];
+        };
+        RenditionInfo: {
+            /** Format: int32 */
+            height: number;
+            /** @description e.g. `1080p`. */
+            label: string;
+            /** Format: int32 */
+            width: number;
+        };
         StartEmailLogin: {
             email: string;
         };
@@ -142,6 +436,55 @@ export interface components {
              * @description Pair with the emailed code in `/api/auth/email/verify-code`.
              */
             login_id: string;
+        };
+        TrashList: {
+            items: components["schemas"]["MediaItem"][];
+            /**
+             * Format: int32
+             * @description Days items stay in the trash before being deleted for good.
+             */
+            retention_days: number;
+        };
+        UpdateMedia: {
+            /** @description Up to 5,000 characters. */
+            description?: string | null;
+            /** @description 1–200 characters. */
+            title?: string | null;
+        };
+        UploadInfo: {
+            /** Format: uuid */
+            media_id: string;
+            /** Format: int64 */
+            part_count: number;
+            /**
+             * Format: int64
+             * @description Every part but the last must be exactly this many bytes.
+             */
+            part_size: number;
+            /** @description Part numbers (1-based) already stored. Empty for a new upload. */
+            uploaded_parts: number[];
+        };
+        /** @description Storage and monthly processing usage against the account's limits. */
+        Usage: {
+            /**
+             * Format: int32
+             * @description Weighted minutes per calendar month (UTC): ×1 up to 1080p, ×2 for 1440p, ×4 for 4K.
+             */
+            processing_minutes_limit: number;
+            /** Format: int64 */
+            processing_minutes_used: number;
+            /** Format: int64 */
+            storage_limit_bytes: number;
+            /**
+             * Format: int64
+             * @description Held for uploads in progress.
+             */
+            storage_reserved_bytes: number;
+            /**
+             * Format: int64
+             * @description Originals of uploaded media (derived files don't count).
+             */
+            storage_used_bytes: number;
         };
         VerifyEmailCode: {
             code: string;
@@ -302,6 +645,33 @@ export interface operations {
             };
         };
     };
+    events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["MediaStatusEvent"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     health: {
         parameters: {
             query?: never;
@@ -348,6 +718,464 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Usage"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_media: {
+        parameters: {
+            query?: {
+                /** @description From the previous page's `next_cursor`. */
+                cursor?: string | null;
+                /** @description Page size, 1–100 (default 24). */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaPage"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    trash_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaItem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMedia"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaItem"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    restore_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaItem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_trash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashList"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    purge_media: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUpload"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadInfo"];
+                };
+            };
+            /** @description `storage_quota_exceeded` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description `file_too_large` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description `unsupported_type` */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    upload_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadInfo"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    abort_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    complete_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaItem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description `upload_incomplete` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    presign_parts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresignParts"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PresignedParts"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

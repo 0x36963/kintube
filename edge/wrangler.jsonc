@@ -1,0 +1,9 @@
+// Cloudflare Worker for the media domain. Deploy (later): `pnpm dlx wrangler deploy`,
+// after `wrangler secret put MEDIA_TOKEN_SECRET` with the API's value.
+{
+  "name": "kintube-media",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "kintube-media" }],
+  "observability": { "enabled": true }
+}

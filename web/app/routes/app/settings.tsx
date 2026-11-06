@@ -1,9 +1,12 @@
-import { Check, HardDrive, KeyRound, LogOut, Mail } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Check, KeyRound, LogOut, Mail } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { Avatar, Button } from "~/components/ui";
 import { APP_NAME } from "~/lib/brand";
+import { formatBytes } from "~/lib/format";
+import { usageQuery } from "~/lib/media";
 import { signOut, useUser } from "~/lib/session";
 
 export function meta() {
@@ -18,11 +21,7 @@ export default function Settings() {
 
   async function handleSignOut() {
     setSigningOut(true);
-    try {
-      await signOut();
-    } finally {
-      navigate("/login", { replace: true });
-    }
+    await signOut(navigate);
   }
 
   return (
@@ -53,14 +52,7 @@ export default function Settings() {
       </Card>
 
       <Card title="Storage">
-        <ul>
-          <Row
-            icon={HardDrive}
-            title="20 GB included"
-            detail="Usage appears here once uploads are switched on"
-            status={<Status>Coming in M1</Status>}
-          />
-        </ul>
+        <StorageUsage />
       </Card>
 
       <div className="mt-8">
@@ -115,5 +107,37 @@ function Status({ ok, children }: { ok?: boolean; children: React.ReactNode }) {
     <span className="shrink-0 rounded-full bg-surface-2 px-2.5 py-0.5 text-xs text-fg-muted ring-1 ring-line">
       {children}
     </span>
+  );
+}
+
+function StorageUsage() {
+  const { data } = useQuery(usageQuery);
+  if (!data) return <div className="skeleton h-14 rounded-lg" />;
+  const used = data.storage_used_bytes + data.storage_reserved_bytes;
+  const pct = Math.min(100, (used / data.storage_limit_bytes) * 100);
+  const processingPct = Math.min(100, (data.processing_minutes_used / data.processing_minutes_limit) * 100);
+  return (
+    <div className="space-y-5">
+      <div>
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="font-medium" data-testid="storage-used">
+            {formatBytes(used)} of {formatBytes(data.storage_limit_bytes)} used
+          </span>
+          <span className="text-fg-muted">{formatBytes(Math.max(0, data.storage_limit_bytes - used))} free</span>
+        </div>
+        <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3">
+          <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(pct, used ? 1 : 0)}%` }} />
+        </div>
+        {data.storage_reserved_bytes > 0 && (
+          <p className="mt-1.5 text-xs text-fg-subtle">Includes {formatBytes(data.storage_reserved_bytes)} held for uploads in progress.</p>
+        )}
+      </div>
+      {/* Hidden until it matters (PLAN.md §4). */}
+      {processingPct >= 80 && (
+        <p className="text-sm text-fg-muted">
+          Video processing this month: {data.processing_minutes_used} of {data.processing_minutes_limit} minutes. It resets on the 1st.
+        </p>
+      )}
+    </div>
   );
 }

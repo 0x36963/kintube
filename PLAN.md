@@ -11,7 +11,7 @@ A private, multi-tenant "YouTube for your own photos and videos." Users sign up,
 | Product | Multi-tenant SaaS, public internet, open sign-up | You |
 | Library scale | Unbounded (from hundreds to hundreds of thousands of items per user) | You |
 | File management | Full: upload, edit, move, delete (with trash) | You |
-| Storage | S3-compatible: **Cloudflare R2** in prod, **MinIO** in dev | You |
+| Storage | S3-compatible: **Cloudflare R2** in prod, **RustFS** in dev (MinIO's community images were discontinued in 2025) | You; dev server chosen in M1 |
 | Video playback | Adaptive **HLS** ladder (CMAF/fMP4), quality picker, **up to 4K (2160p) in v1** | You |
 | Default quota | **20 GB** storage per user. File-size and processing limits are tied to it (§4) | You set storage; the derived limits are my proposal |
 | Database ops | **Self-managed Postgres** on Hetzner (§7.1) | You |
@@ -58,7 +58,7 @@ React Router v8 baseline (shipped 2026-06-17): Node ≥ 22.22, React ≥ 19.2.7,
 
 | Component | Tech | Responsibility |
 |---|---|---|
-| `web/` | React Router v8 SPA, Vite 7, TS, Tailwind v4, Radix primitives, TanStack Query + Virtual, Vidstack (hls.js), Uppy, MapLibre | All UI |
+| `web/` | React Router v8 SPA, Vite 7, TS, Tailwind v4, Radix primitives, TanStack Query + Virtual, Video.js v10 (hls.js), own multipart uploader, MapLibre | All UI |
 | `backend/crates/api` | Axum, tower-http, SQLx, utoipa (OpenAPI), webauthn-rs, openidconnect | HTTP API, auth, authz, upload orchestration, token minting |
 | `backend/crates/worker` | Tokio + subprocess ffmpeg/vips/exiftool | Media processing jobs, purge jobs, maintenance |
 | `backend/crates/app-core` | SQLx, aws-sdk-s3 | Domain types, DB access, storage abstraction, job queue, authz checks |
@@ -82,22 +82,22 @@ Rust handlers are annotated with `utoipa`, which produces `openapi.json`. `opena
 
 ### 3.1 Upload (resumable, direct to R2)
 1. `POST /api/uploads` sends `{filename, size, mime}`. The server checks quota and allowed type, **reserves** the bytes against the quota, creates a `media` row (`status=uploading`), starts an S3 multipart upload and returns `{media_id, upload_id, part_size}`.
-2. The client (Uppy AwsS3 multipart) requests presigned part URLs in batches and uploads parts in parallel, straight to R2. Interrupted uploads can resume.
+2. The client (our own small uploader, `web/app/lib/upload/`) requests presigned part URLs in batches and uploads 4 parts in parallel, straight to R2. Interrupted uploads can resume. In-progress uploads are remembered in localStorage; after a refresh, re-picking the file sends only the missing parts.
 3. `POST /api/uploads/:id/complete` completes the multipart upload, sets `status=processing` and enqueues a `process_media` job.
 4. If the upload is aborted or abandoned, the quota reservation is released. An R2 lifecycle rule aborts incomplete multipart uploads after 7 days.
-- Gotchas: R2 CORS must allow `PUT` and **expose `ETag`**. Part size scales with file size because S3 allows at most 10,000 parts. The worker sniffs magic bytes and does not trust the client's MIME type.
+- Completion reads part ETags server-side via `ListParts`, so the bucket's CORS only needs to allow `PUT` and browsers never read `ETag`. Part size is 16 MiB by default and grows for huge files because S3 allows at most 10,000 parts. The worker probes the actual file and does not trust the client's MIME type.
 - A global upload tray persists across route changes, so users can browse while uploads run.
 
 ### 3.2 Video processing (`process_media`, kind=video)
 1. **Probe**: ffprobe reads duration, codecs, dimensions, rotation, HDR flags, `creation_time` and QuickTime GPS.
-2. **Instant play**: if the original is browser-compatible (H.264/AAC MP4), it is playable immediately with a "HD processing…" badge.
+2. **Instant play** (deferred to M2): if the original is browser-compatible (H.264/AAC MP4), it would be playable immediately with a "HD processing…" badge.
 3. **Poster**: ffmpeg's `thumbnail` filter picks a frame, which is encoded to WebP at 3 sizes, plus a thumbhash placeholder.
 4. **HLS ladder**: one ffmpeg run with `split` and `-var_stream_map`.
    - H.264 High + AAC 128k, fMP4/CMAF segments, 6 s segments, keyframes forced every 2 s, `-sc_threshold 0`.
    - Rungs are limited to the source resolution and keyed on the **short side**, so vertical video works: 2160 / 1440 / 1080 / 720 / 480 / 360.
    - With 4K on, a 2160p source costs about **4×** the encode work of a 1080p source (output pixel area: about 15.6 vs 3.6 Mpx per frame across the ladder). To keep that manageable:
      - Use faster x264 presets for the 2160p and 1440p rungs.
-     - Benchmark hardware encoding (QSV/NVENC) during M1 instead of after v1.
+     - Benchmark hardware encoding (QSV/NVENC) when choosing the production worker boxes (moved from M1: needs the target hardware).
      - Size the worker boxes for it.
    - HDR is tonemapped to SDR (`zscale` + `tonemap`) for v1.
 5. **Scrub sprites**: one frame every `max(1s, duration/200)`, 160 px wide, tiled 10×10 per sheet, plus a WebVTT thumbnails track with `#xywh=`.
@@ -117,7 +117,7 @@ Multi-tenant fairness: the job queue serves users **round-robin**, so one person
 - URL shape: `https://media.example-usercontent.com/{token}/m/{media_id}/hls/master.m3u8`. HLS playlists use **relative** segment URLs, so every segment inherits the token. The playlists stay static and cacheable.
 - The gateway Worker verifies the token, reads from the R2 binding, supports `Range` and caches by object key with the token stripped.
 - The **separate cookieless domain** means a malicious upload can never run script on the app origin. The gateway always sends `nosniff`, and non-media originals get `Content-Disposition: attachment`.
-- Dev: the Rust API serves the same `/{token}/…` paths from MinIO. Both implementations are checked against shared HMAC test vectors.
+- Dev: the Rust API serves the same `/{token}/…` paths from RustFS. Both implementations are checked against shared HMAC test vectors.
 
 ---
 
@@ -159,7 +159,7 @@ reports(id, resource_type, resource_id, reporter, reason, status)
 audit_log(id, actor_id, action, target, meta, created_at)
 ```
 
-- IDs are UUIDv7 (time-ordered). R2 keys follow `u/{owner_id}/m/{media_id}/{original|hls/…|thumb/…}`.
+- IDs are UUIDv7 (time-ordered). R2 keys follow `m/{media_id}/{original|hls/…|poster/…|sprites/…}`. There's no owner prefix: the gateway maps URLs straight to keys, and ownership is checked when tokens are issued.
 - **Authz has one choke point**: `core::authz::can(actor, action, resource)`. Every query goes through it, and integration tests assert that **every endpoint rejects cross-tenant access**. Postgres RLS gets evaluated as a hardening layer in M6.
 - **Quota & limits** (all per-plan columns, so Stripe tiers can change them later):
   - **Storage: 20 GB.** User-facing usage counts originals only. Derived bytes are tracked internally. H.264 renditions need more bits than iPhone HEVC originals, so with 4K on, 1 GB of quota can cost about 2–2.5 GB of real R2 storage. Price tiers with that in mind.
@@ -235,7 +235,7 @@ audit_log(id, actor_id, action, target, meta, created_at)
 ```
 kintube/
   backend/                 Cargo workspace
-    crates/{api,app-core}  + worker, media from M1 (`app-core`, not `core`, which would shadow Rust's built-in crate)
+    crates/{api,app-core,media,worker}  (`app-core`, not `core`, which would shadow Rust's built-in crate)
     migrations/            sqlx migrations
   web/                     React Router v8 SPA
   edge/                    Cloudflare Worker (media gateway + share OG)
@@ -246,7 +246,7 @@ kintube/
   PLAN.md
 ```
 
-- **CI**: cargo fmt/clippy/test with real Postgres and MinIO (`sqlx::test`), pnpm typecheck/lint/test, OpenAPI drift check, and a Playwright e2e test of sign-in → upload → watch.
+- **CI**: cargo fmt/clippy/test with real Postgres, RustFS and ffmpeg (`sqlx::test`), pnpm typecheck/lint/test, OpenAPI drift check, and a Playwright e2e test of sign-in → upload → watch.
 - **Media test corpus**:
   - Video: iPhone HEVC (HDR), rotated video, vertical video, VFR, no audio, 4K, tiny, truncated or corrupt files, MKV, AVI
   - Photo: HEIC, DNG, CR3, a Live Photo pair, a 20k-px panorama, PNG with alpha
@@ -275,16 +275,23 @@ kintube/
 - App shell: dark layout, sidebar, top bar, routes stubbed
 - Magic-link + OTP sign-in, sessions, `/api/me`
 - *Shipped*: 12 Rust tests (unit + integration on real Postgres) and 8 Playwright e2e tests (desktop + mobile), with sign-in emails read back from Mailpit. The CI workflow is written but hasn't run yet: there's no remote.
-- *Carry into M1*: pick the dev S3 server. MinIO's community distribution changed in 2025; compare it with Garage and SeaweedFS before choosing. Add the `worker` and `media` crates.
 
-**M1 — Video vertical slice** ⭐
-- Resumable multipart upload to MinIO/R2 with quota reservation and an upload tray
+**M1 — Video vertical slice** ⭐ ✅ done 2026-11-06
+- Resumable multipart upload to RustFS/R2 with quota reservation and an upload tray
 - Postgres job queue with round-robin fairness, timeouts and retries
 - Video pipeline: probe, poster, HLS ladder, scrub sprites, SSE progress
 - Media tokens; dev media route plus the Cloudflare gateway Worker
-- `/videos` grid and `/watch/:id` with Vidstack, quality menu and sprite scrubbing
+- `/videos` grid and `/watch/:id` with Video.js v10, quality menu and sprite scrubbing
 - Delete → trash → purge job (frees R2 objects and quota)
 - *Exit criterion*: a 4 GB iPhone HEVC upload survives a refresh mid-upload, becomes watchable at 360–1080p and only its owner can access it.
+- *Exit criterion met* on a 4.24 GiB portrait HEVC file (iPhone-style rotation and creation-date metadata):
+  - The page was refreshed with 86 of 272 parts stored. Re-picking the file sent exactly the 186 missing parts.
+  - It was processed at 5.25× real time on an M5 Pro, with live progress throughout.
+  - It plays at 1080p/720p/480p/360p.
+  - Another account gets 404, and a forged media token gets 403.
+- *Deferred*:
+  - Instant play of originals → M2
+  - Gateway Cache API tuning and hardware-encode benchmarks → production deploy, which needs real Cloudflare/Hetzner accounts
 
 **M2 — The YouTube experience**
 - Channels (a default one per user, plus more), playlists, autoplay next, Up-next rail

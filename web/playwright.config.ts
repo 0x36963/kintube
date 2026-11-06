@@ -1,12 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * End-to-end tests against the real stack: Vite dev server → Rust API → Postgres,
- * with sign-in emails read back from Mailpit. Start Postgres + Mailpit first
- * (`make dev-up`); the API and web servers are started here if not already running.
+ * End-to-end tests against the real stack: SPA → Rust API → Postgres + S3, a media worker
+ * running ffmpeg, and sign-in emails read back from Mailpit. Start the dev services first
+ * (`make dev-up && make migrate`); the API, worker and web servers are started here.
  */
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -20,6 +21,14 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   webServer: [
+    {
+      // No HTTP port: ready once it logs that it started. Always started fresh; a second
+      // worker alongside a dev one is harmless (jobs are claimed with SKIP LOCKED).
+      command: "cargo run -q -p worker",
+      cwd: "../backend",
+      wait: { stdout: /worker started/ },
+      timeout: 300_000,
+    },
     {
       command: "cargo run -q -p api -- serve",
       cwd: "../backend",

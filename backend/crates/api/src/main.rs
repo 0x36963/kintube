@@ -4,7 +4,7 @@ use anyhow::{Context, Result, bail};
 use app_core::{Config, Mailer, db};
 use tracing_subscriber::EnvFilter;
 
-const USAGE: &str = "usage: api [serve | migrate | openapi]";
+const USAGE: &str = "usage: api [serve | migrate | storage-setup | openapi]";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,6 +29,15 @@ async fn main() -> Result<()> {
             tracing::info!("migrations applied");
             Ok(())
         }
+        "storage-setup" => {
+            // Bucket, CORS for browser uploads, and the abandoned-upload lifecycle rule.
+            let storage = app_core::storage::Storage::new(&config.s3);
+            storage
+                .setup_bucket(std::slice::from_ref(&config.app_origin))
+                .await?;
+            tracing::info!(bucket = storage.bucket(), "storage configured");
+            Ok(())
+        }
         other => bail!("unknown command {other:?}\n{USAGE}"),
     }
 }
@@ -41,7 +50,7 @@ async fn serve(config: Config) -> Result<()> {
     let bind_addr = config.bind_addr;
 
     let state = api::AppState::new(db, mailer, config);
-    state.spawn_maintenance();
+    state.spawn_background();
 
     let listener = tokio::net::TcpListener::bind(bind_addr)
         .await

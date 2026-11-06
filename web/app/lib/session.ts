@@ -8,7 +8,8 @@ export const queryClient = new QueryClient({
   // A 401 from any query means the session ended (expired, or signed out elsewhere).
   queryCache: new QueryCache({
     onError: (error) => {
-      if (error instanceof ApiError && error.status === 401) {
+      const onAuthPage = /^\/(login|auth)\b/.test(window.location.pathname);
+      if (error instanceof ApiError && error.status === 401 && !onAuthPage) {
         queryClient.clear();
         window.location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`);
       }
@@ -38,9 +39,18 @@ export function setSignedIn(me: Me) {
   queryClient.setQueryData(meQuery.queryKey, me);
 }
 
-export async function signOut() {
-  unwrap(await api.POST("/api/auth/logout"));
-  queryClient.clear();
+/**
+ * Ends the session, then leaves the app shell before clearing cached data. Clearing first
+ * would make the still-mounted pages refetch and hit 401s.
+ */
+export async function signOut(navigate: (to: string, opts: { replace: boolean }) => void | Promise<void>) {
+  try {
+    unwrap(await api.POST("/api/auth/logout"));
+  } finally {
+    queryClient.setQueryData(meQuery.queryKey, null); // so /login doesn't bounce back
+    await navigate("/login", { replace: true });
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== meQuery.queryKey[0] });
+  }
 }
 
 /** Router context set by the app layout's auth middleware. */

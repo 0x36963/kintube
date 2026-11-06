@@ -4,6 +4,8 @@ import { Outlet, redirect } from "react-router";
 
 import { MobileNav, Sidebar } from "~/components/sidebar";
 import { TopBar } from "~/components/top-bar";
+import { DropZone, UploadTray } from "~/components/uploads";
+import { useMediaEvents } from "~/lib/events";
 import { UserContext, meQuery, queryClient, userRouterContext } from "~/lib/session";
 
 import type { Route } from "./+types/layout";
@@ -29,6 +31,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
   // Prefer the live cache entry so profile edits show up without a navigation.
   const user = useQuery(meQuery).data ?? loaderData.user;
   const [expanded, setExpanded] = useSidebarPreference();
+  useMediaEvents();
 
   return (
     <UserContext.Provider value={user}>
@@ -40,6 +43,8 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
         </main>
       </div>
       <MobileNav />
+      <UploadTray />
+      <DropZone />
     </UserContext.Provider>
   );
 }

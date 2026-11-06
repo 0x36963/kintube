@@ -19,6 +19,8 @@ pub use state::AppState;
     tags(
         (name = "auth", description = "Passwordless sign-in and sessions"),
         (name = "account", description = "The signed-in user"),
+        (name = "uploads", description = "Resumable uploads straight to object storage"),
+        (name = "media", description = "The signed-in user's library"),
         (name = "system", description = "Health and metadata"),
     )
 )]
@@ -29,11 +31,20 @@ fn api_router() -> OpenApiRouter<AppState> {
         .merge(routes::system::router())
         .merge(routes::auth::router())
         .merge(routes::account::router())
+        .merge(routes::uploads::router())
+        .merge(routes::media::router())
+        .merge(routes::events::router())
 }
 
 /// The full application router, ready to serve.
 pub fn app(state: AppState) -> Router {
-    let (router, api) = api_router().split_for_parts();
+    let (mut router, api) = api_router().split_for_parts();
+    if state.config.media.serve_from_api {
+        router = router.route(
+            "/media/{token}/m/{media_id}/{*path}",
+            get(routes::media_files::serve).options(routes::media_files::preflight),
+        );
+    }
     router
         .route("/api/openapi.json", get(move || async move { Json(api) }))
         // Layers run outermost-last: trace → same-origin check → auth rate limit → handler.

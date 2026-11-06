@@ -11,7 +11,10 @@ export default [
   layout("routes/app/layout.tsx", [
     index("routes/app/home.tsx"),
     route("settings", "routes/app/settings.tsx"),
-    ...["videos", "photos", "map", "history", "playlists", "albums", "liked", "shared", "search"].map(comingSoon),
+    route("videos", "routes/app/videos.tsx"),
+    route("watch/:id", "routes/app/watch.tsx"),
+    route("trash", "routes/app/trash.tsx"),
+    ...["photos", "map", "history", "playlists", "albums", "liked", "shared", "search"].map(comingSoon),
   ]),
 
   route("*", "routes/not-found.tsx"),

@@ -8,6 +8,7 @@ import {
   ListVideo,
   MapPinned,
   Search,
+  Trash2,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -23,13 +24,7 @@ export interface NavItem {
 
 export const primaryNav: NavItem[] = [
   { to: "/", label: "Home", icon: House },
-  {
-    to: "/videos",
-    label: "Videos",
-    icon: Clapperboard,
-    blurb: "Every video you've uploaded, in HD up to 4K, with resume and quality switching.",
-    milestone: "M1",
-  },
+  { to: "/videos", label: "Videos", icon: Clapperboard },
   {
     to: "/photos",
     label: "Photos",
@@ -75,6 +70,7 @@ export const libraryNav: NavItem[] = [
     blurb: "The moments you've marked as favourites.",
     milestone: "M2",
   },
+  { to: "/trash", label: "Trash", icon: Trash2 },
 ];
 
 export const sharedNav: NavItem[] = [

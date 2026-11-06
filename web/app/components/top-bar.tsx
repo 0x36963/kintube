@@ -1,10 +1,11 @@
-import { LogOut, Menu, Search, Settings, Upload } from "lucide-react";
+import { LogOut, Menu, Search, Settings } from "lucide-react";
 import { DropdownMenu } from "radix-ui";
 import { Form, Link, useNavigate, useSearchParams } from "react-router";
 
 import { signOut, useUser } from "~/lib/session";
 
 import { Avatar, Logo, cx } from "./ui";
+import { UploadButton } from "./uploads";
 
 export function TopBar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const [params] = useSearchParams();
@@ -41,15 +42,7 @@ export function TopBar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
             <Search className="size-5" />
           </span>
         </Link>
-        <button
-          type="button"
-          disabled
-          title="Uploading arrives in the next milestone"
-          className="hidden h-9 items-center gap-2 rounded-full bg-surface-2 px-4 text-sm font-medium text-fg-muted sm:inline-flex disabled:cursor-not-allowed"
-        >
-          <Upload className="size-4" />
-          Upload
-        </button>
+        <UploadButton className="inline-flex h-9 items-center gap-2 rounded-full bg-surface-2 px-3 text-sm font-medium hover:bg-surface-3 sm:px-4" />
         <UserMenu />
       </div>
     </header>
@@ -60,12 +53,8 @@ function UserMenu() {
   const user = useUser();
   const navigate = useNavigate();
 
-  async function handleSignOut() {
-    try {
-      await signOut();
-    } finally {
-      navigate("/login", { replace: true });
-    }
+  function handleSignOut() {
+    void signOut(navigate);
   }
 
   return (

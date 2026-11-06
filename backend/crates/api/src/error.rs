@@ -102,3 +102,50 @@ impl From<AuthError> for ApiError {
         }
     }
 }
+
+impl From<app_core::media::MediaError> for ApiError {
+    fn from(err: app_core::media::MediaError) -> Self {
+        use app_core::media::MediaError as E;
+        let message = err.to_string();
+        let message = {
+            let mut c = message.chars();
+            c.next()
+                .map(|f| f.to_uppercase().chain(c).collect::<String>() + ".")
+                .unwrap_or_default()
+        };
+        match err {
+            E::NotFound => Self::new(
+                StatusCode::NOT_FOUND,
+                "not_found",
+                "That video doesn't exist.",
+            ),
+            E::UnsupportedType => Self::new(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "unsupported_type",
+                message,
+            ),
+            E::FileTooLarge => Self::new(StatusCode::PAYLOAD_TOO_LARGE, "file_too_large", message),
+            E::EmptyFile => Self::new(StatusCode::BAD_REQUEST, "empty_file", message),
+            E::StorageQuotaExceeded => {
+                Self::new(StatusCode::CONFLICT, "storage_quota_exceeded", message)
+            }
+            E::UploadIncomplete => Self::new(StatusCode::CONFLICT, "upload_incomplete", message),
+            E::InvalidState(_) => Self::new(StatusCode::CONFLICT, "invalid_state", message),
+            E::Db(err) => err.into(),
+            E::Storage(err) => {
+                tracing::error!(error = ?err, "object storage error");
+                Self::new(
+                    StatusCode::BAD_GATEWAY,
+                    "storage_unavailable",
+                    "Storage is temporarily unavailable. Please try again.",
+                )
+            }
+        }
+    }
+}
+
+impl ApiError {
+    pub fn bad_request(code: &'static str, message: impl Into<String>) -> Self {
+        Self::new(StatusCode::BAD_REQUEST, code, message)
+    }
+}

@@ -173,6 +173,35 @@
         }
       }
     },
+    "/api/events": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Event stream (`text/event-stream`). Events: `media` (a [`MediaStatusEvent`]) and\n`resync` (updates were missed; refetch).",
+        "operationId": "events",
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaStatusEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -230,10 +259,622 @@
           }
         }
       }
+    },
+    "/api/me/usage": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "operationId": "usage",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usage"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "The library, newest first. Includes items still processing or that failed.",
+        "operationId": "list_media",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "From the previous page's `next_cursor`.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1–100 (default 24).",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/{id}": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "summary": "One item, with playback URLs once it's ready.",
+        "operationId": "get_media",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Move to the trash. Restorable for 30 days, then deleted for good.",
+        "operationId": "trash_media",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "media"
+        ],
+        "operationId": "update_media",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMedia"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/{id}/restore": {
+      "post": {
+        "tags": [
+          "media"
+        ],
+        "operationId": "restore_media",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trash": {
+      "get": {
+        "tags": [
+          "media"
+        ],
+        "operationId": "list_trash",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrashList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trash/{id}": {
+      "delete": {
+        "tags": [
+          "media"
+        ],
+        "summary": "Delete a trashed item for good, freeing its storage.",
+        "operationId": "purge_media",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/uploads": {
+      "post": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Start an upload. Fails with `storage_quota_exceeded` if the file doesn't fit.",
+        "operationId": "create_upload",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadInfo"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`storage_quota_exceeded`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`file_too_large`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`unsupported_type`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/uploads/{id}": {
+      "get": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Which parts are already stored. Use it to resume after a refresh or network loss.",
+        "operationId": "upload_status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadInfo"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Cancel an upload and release its reserved storage.",
+        "operationId": "abort_upload",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/uploads/{id}/complete": {
+      "post": {
+        "tags": [
+          "uploads"
+        ],
+        "summary": "Finish the upload and queue processing. Idempotent.",
+        "operationId": "complete_upload",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`upload_incomplete`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/uploads/{id}/parts": {
+      "post": {
+        "tags": [
+          "uploads"
+        ],
+        "operationId": "presign_parts",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignParts"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedParts"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "CreateUpload": {
+        "type": "object",
+        "required": [
+          "filename",
+          "size"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string"
+          },
+          "mime_type": {
+            "type": "string",
+            "description": "The browser's `File.type`; may be empty."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bytes."
+          }
+        }
+      },
       "ErrorBody": {
         "type": "object",
         "description": "Every error response has this shape: `{\"error\": {\"code\": \"...\", \"message\": \"...\"}}`.",
@@ -305,6 +946,307 @@
           }
         }
       },
+      "MediaDetail": {
+        "type": "object",
+        "required": [
+          "media"
+        ],
+        "properties": {
+          "media": {
+            "$ref": "#/components/schemas/MediaItem"
+          },
+          "playback": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Playback",
+                "description": "Present once the video is ready."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "MediaItem": {
+        "type": "object",
+        "description": "A video (photos arrive in M3) as shown in grids and lists.",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "title",
+          "description",
+          "original_filename",
+          "bytes",
+          "created_at",
+          "processing_progress",
+          "posters"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "hdr": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`video` or `photo`."
+          },
+          "original_filename": {
+            "type": "string"
+          },
+          "posters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Poster"
+            },
+            "description": "Poster images, smallest first, as signed URLs. Empty until processed."
+          },
+          "processing_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why processing failed, for the owner."
+          },
+          "processing_progress": {
+            "type": "number",
+            "format": "float",
+            "description": "0–1 while processing."
+          },
+          "status": {
+            "type": "string",
+            "description": "`uploading`, `processing`, `ready` or `failed`."
+          },
+          "taken_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was recorded, if the file says."
+          },
+          "title": {
+            "type": "string"
+          },
+          "trashed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Display size, after rotation. Known once processed."
+          }
+        }
+      },
+      "MediaPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaItem"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `cursor` to get the next page; absent on the last page."
+          }
+        }
+      },
+      "MediaStatusEvent": {
+        "type": "object",
+        "description": "Payload of a `media` event.",
+        "required": [
+          "media_id",
+          "status",
+          "progress"
+        ],
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "media_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "progress": {
+            "type": "number",
+            "format": "float"
+          },
+          "status": {
+            "type": "string",
+            "description": "`processing`, `ready`, `failed`, or `deleted`."
+          }
+        }
+      },
+      "Playback": {
+        "type": "object",
+        "required": [
+          "hls_url",
+          "renditions"
+        ],
+        "properties": {
+          "hls_url": {
+            "type": "string",
+            "description": "HLS master playlist (signed URL; segments inherit the token)."
+          },
+          "renditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RenditionInfo"
+            }
+          },
+          "thumbnails_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "WebVTT track of scrub-preview thumbnails."
+          }
+        }
+      },
+      "Poster": {
+        "type": "object",
+        "required": [
+          "url",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "url": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "PresignParts": {
+        "type": "object",
+        "required": [
+          "part_numbers"
+        ],
+        "properties": {
+          "part_numbers": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Up to 100 part numbers."
+          }
+        }
+      },
+      "PresignedPart": {
+        "type": "object",
+        "required": [
+          "part_number",
+          "url"
+        ],
+        "properties": {
+          "part_number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "url": {
+            "type": "string",
+            "description": "`PUT` the part's bytes here. Valid for an hour."
+          }
+        }
+      },
+      "PresignedParts": {
+        "type": "object",
+        "required": [
+          "parts"
+        ],
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PresignedPart"
+            }
+          }
+        }
+      },
+      "RenditionInfo": {
+        "type": "object",
+        "required": [
+          "label",
+          "width",
+          "height"
+        ],
+        "properties": {
+          "height": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "label": {
+            "type": "string",
+            "description": "e.g. `1080p`."
+          },
+          "width": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "StartEmailLogin": {
         "type": "object",
         "required": [
@@ -326,6 +1268,114 @@
             "type": "string",
             "format": "uuid",
             "description": "Pair with the emailed code in `/api/auth/email/verify-code`."
+          }
+        }
+      },
+      "TrashList": {
+        "type": "object",
+        "required": [
+          "items",
+          "retention_days"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaItem"
+            }
+          },
+          "retention_days": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Days items stay in the trash before being deleted for good.",
+            "minimum": 0
+          }
+        }
+      },
+      "UpdateMedia": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Up to 5,000 characters."
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "1–200 characters."
+          }
+        }
+      },
+      "UploadInfo": {
+        "type": "object",
+        "required": [
+          "media_id",
+          "part_size",
+          "part_count",
+          "uploaded_parts"
+        ],
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "part_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "part_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Every part but the last must be exactly this many bytes."
+          },
+          "uploaded_parts": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Part numbers (1-based) already stored. Empty for a new upload."
+          }
+        }
+      },
+      "Usage": {
+        "type": "object",
+        "description": "Storage and monthly processing usage against the account's limits.",
+        "required": [
+          "storage_limit_bytes",
+          "storage_used_bytes",
+          "storage_reserved_bytes",
+          "processing_minutes_limit",
+          "processing_minutes_used"
+        ],
+        "properties": {
+          "processing_minutes_limit": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Weighted minutes per calendar month (UTC): ×1 up to 1080p, ×2 for 1440p, ×4 for 4K."
+          },
+          "processing_minutes_used": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "storage_limit_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "storage_reserved_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Held for uploads in progress."
+          },
+          "storage_used_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Originals of uploaded media (derived files don't count)."
           }
         }
       },
@@ -367,6 +1417,14 @@
     {
       "name": "account",
       "description": "The signed-in user"
+    },
+    {
+      "name": "uploads",
+      "description": "Resumable uploads straight to object storage"
+    },
+    {
+      "name": "media",
+      "description": "The signed-in user's library"
     },
     {
       "name": "system",

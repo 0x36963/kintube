@@ -1,0 +1,21 @@
+{
+  "_comment": "Media path-token test vectors, generated independently with Python's hmac module. Checked by backend/crates/app-core/src/media_token.rs and the Cloudflare media gateway (edge/).",
+  "secret": "test-vector-secret-0123456789abcdef",
+  "cases": [
+    {
+      "media_id": "01a1a8ef-c77c-71d8-a97a-9bfcfa15d3aa",
+      "expires": 1800000000,
+      "token": "1800000000.cVLCfmoO92h_wS4l612Daw"
+    },
+    {
+      "media_id": "01a1a8ef-c77c-71d8-a97a-9bfcfa15d3aa",
+      "expires": 1800003600,
+      "token": "1800003600.bBl3dkfc6MS0peINfaD8HQ"
+    },
+    {
+      "media_id": "0196f5d2-0000-7000-8000-000000000001",
+      "expires": 2000000000,
+      "token": "2000000000.nSLlIEgFLBmg_tNa_oJj4g"
+    }
+  ]
+}

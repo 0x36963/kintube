@@ -24,10 +24,18 @@ jobs:
         options: >-
           --health-cmd "pg_isready -h 127.0.0.1 -U app -d app"
           --health-interval 2s --health-timeout 3s --health-retries 30
+      s3:
+        image: rustfs/rustfs:1.0.4
+        env: { RUSTFS_ACCESS_KEY: kintube, RUSTFS_SECRET_KEY: kintube-dev-secret }
+        ports: ["9000:9000"]
     defaults:
       run: { working-directory: backend }
     steps:
       - uses: actions/checkout@v5
+      - name: Wait for S3
+        run: for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:9000 && exit 0; sleep 1; done; exit 1
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg && ffmpeg -version | head -1
       - uses: dtolnay/rust-toolchain@stable
         with: { components: "rustfmt, clippy" }
       - uses: Swatinem/rust-cache@v2
@@ -55,9 +63,23 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run build
 
+  edge:
+    runs-on: ubuntu-latest
+    defaults:
+      run: { working-directory: edge }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+        with: { package_json_file: edge/package.json }
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: pnpm, cache-dependency-path: edge/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm test
+
   e2e:
     runs-on: ubuntu-latest
-    needs: [backend, web]
+    needs: [backend, web, edge]
     services:
       postgres:
         image: imresamu/postgis:18-3.6.1-trixie
@@ -69,8 +91,16 @@ jobs:
       mailpit:
         image: axllent/mailpit:v1.33
         ports: ["1025:1025", "8025:8025"]
+      s3:
+        image: rustfs/rustfs:1.0.4
+        env: { RUSTFS_ACCESS_KEY: kintube, RUSTFS_SECRET_KEY: kintube-dev-secret }
+        ports: ["9000:9000"]
     steps:
       - uses: actions/checkout@v5
+      - name: Wait for S3
+        run: for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:9000 && exit 0; sleep 1; done; exit 1
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg && ffmpeg -version | head -1
       - uses: pnpm/action-setup@v6
         with: { package_json_file: web/package.json }
       - uses: actions/setup-node@v5
@@ -80,7 +110,7 @@ jobs:
         with: { workspaces: backend }
       - name: Configure and migrate
         working-directory: backend
-        run: cp .env.example .env && cargo build -p api && cargo run -q -p api -- migrate
+        run: cp .env.example .env && cargo build -p api -p worker && cargo run -q -p api -- migrate && cargo run -q -p api -- storage-setup
       - working-directory: web
         run: pnpm install --frozen-lockfile && pnpm exec playwright install --with-deps chromium
       - working-directory: web

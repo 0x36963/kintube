@@ -9,14 +9,18 @@ anyhow = "1.0.104"
 app-core = { version = "0.1.0", path = "../app-core" }
 axum = { version = "0.8.9", features = ["macros"] }
 axum-extra = { version = "0.12.6", features = ["cookie"] }
+base64 = "0.23.1"
 chrono = "0.4.45"
 dotenvy = "0.15.7"
+futures = "0.3.34"
 governor = "0.10.4"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "postgres", "macros"] }
 time = "0.3.55"
 tokio = { version = "1.54.1", features = ["full"] }
+tokio-stream = { version = "0.1.19", features = ["sync"] }
+tokio-util = { version = "0.7.20", features = ["io"] }
 tower = "0.5.3"
 tower-http = { version = "0.7.1", features = ["trace", "request-id", "util"] }
 tracing = "0.1.44"
@@ -30,4 +34,6 @@ workspace = true
 
 [dev-dependencies]
 http-body-util = "0.1.5"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls"] }
 tower = { version = "0.5.3", features = ["util"] }
+uuid = "1.29.0"
